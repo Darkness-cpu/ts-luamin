@@ -11,6 +11,7 @@
 	var stdin = process.stdin;
 	var data;
 	var log = console.log;
+
 	var main = function() {
 
 		if (/^(?:-h|--help|undefined)$/.test(option)) {
