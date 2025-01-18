@@ -1,5 +1,5 @@
 {
-  "name": "luamin",
+  "name": "@ts/luamin",
   "version": "1.0.0",
   "main": "./luamin.js",
   "module": "./luamin.mjs",
