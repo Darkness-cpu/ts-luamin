@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "./luamin.js",
   "types": "./luamin.d.ts",
+  "bin": "cli.js",
   "keywords": [],
   "author": "",
   "license": "ISC",
