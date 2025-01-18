@@ -2,6 +2,7 @@
   "name": "luamin",
   "version": "1.0.0",
   "main": "./luamin.js",
+  "module": "./luamin.mjs",
   "types": "./luamin.d.ts",
   "files": ["cli.js","luamin.js","luamin.d.ts"],
   "bin": "cli.js",
