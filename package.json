@@ -7,7 +7,7 @@
   "files": ["cli.js","luamin.js","luamin.d.ts"],
   "bin": "cli.js",
   "keywords": [],
-  "author": "",
+  "author": "mistakes",
   "license": "ISC",
   "description": ""
 },
