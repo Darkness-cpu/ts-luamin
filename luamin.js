@@ -1,15 +1,6 @@
-/*! https://mths.be/luamin v1.0.4 by @mathias */
-;(function(root) {
+function(root) {
 
-	// Detect free variables `exports`
-	var freeExports = typeof exports == 'object' && exports;
-
-	// Detect free variable `module`
-	var freeModule = typeof module == 'object' && module &&
-		module.exports == freeExports && module;
-
-	// Detect free variable `global`, from Node.js or Browserified code,
-	// and use it as `root`
+	// Detect free variable `global`, from Node.js
 	var freeGlobal = typeof global == 'object' && global;
 	if (freeGlobal.global === freeGlobal || freeGlobal.window === freeGlobal) {
 		root = freeGlobal;
@@ -257,415 +248,65 @@
 		} else if (
 			expressionType == 'LogicalExpression' ||
 			expressionType == 'BinaryExpression'
+			) {
+
+			currentPrecedence = PRECEDENCE[expression.operator];
+			if (currentPrecedence > options.precedence) {
+				result = formatBase(expression.left);
+				result = joinStatements(result, expression.operator);
+				result = joinStatements(result, formatBase(expression.right), ' ');
+			} else {
+				associativity = expression.operator == 'and' || expression.operator == 'or'
+					? 'left'
+					: 'right';
+				result = formatBase(expression.left);
+				result = joinStatements(result, expression.operator);
+				result = joinStatements(result, formatBase(expression.right), ' ');
+			}
+
+		} else if (
+			expressionType == 'UnaryExpression'
 		) {
-
-			// If an expression with precedence x
-			// contains an expression with precedence < x,
-			// the inner expression must be wrapped in parens.
-			operator = expression.operator;
+			operator = expression.operator == '#' ? 'unary#' : expression.operator;
 			currentPrecedence = PRECEDENCE[operator];
-			associativity = 'left';
 
-			result = formatExpression(expression.left, {
-				'precedence': currentPrecedence,
-				'direction': 'left',
-				'parent': operator
-			});
-			result = joinStatements(result, operator);
-			result = joinStatements(result, formatExpression(expression.right, {
-				'precedence': currentPrecedence,
-				'direction': 'right',
-				'parent': operator
-			}));
-
-			if (operator == '^' || operator == '..') {
-				associativity = "right";
-			}
-
-			if (
-				currentPrecedence < options.precedence ||
-				(
-					currentPrecedence == options.precedence &&
-					associativity != options.direction &&
-					options.parent != '+' &&
-					!(options.parent == '*' && (operator == '/' || operator == '*'))
-				)
-			) {
-				// The most simple case here is that of
-				// protecting the parentheses on the RHS of
-				// `1 - (2 - 3)` but deleting them from `(1 - 2) - 3`.
-				// This is generally the right thing to do. The
-				// semantics of `+` are special however: `1 + (2 - 3)`
-				// == `1 + 2 - 3`. `-` and `+` are the only two operators
-				// who share their precedence level. `*` also can
-				// commute in such a way with `/`, but not with `%`
-				// (all three share a precedence). So we test for
-				// all of these conditions and avoid emitting
-				// parentheses in the cases where we don’t have to.
-				result = '(' + result + ')';
-			}
-
-		} else if (expressionType == 'UnaryExpression') {
-
-			operator = expression.operator;
-			currentPrecedence = PRECEDENCE['unary' + operator];
-
-			result = joinStatements(
-				operator,
-				formatExpression(expression.argument, {
-					'precedence': currentPrecedence
-				})
-			);
-
-			if (
-				currentPrecedence < options.precedence &&
-				// In principle, we should parenthesize the RHS of an
-				// expression like `3^-2`, because `^` has higher precedence
-				// than unary `-` according to the manual. But that is
-				// misleading on the RHS of `^`, since the parser will
-				// always try to find a unary operator regardless of
-				// precedence.
-				!(
-					(options.parent == '^') &&
-					options.direction == 'right'
-				)
-			) {
-				result = '(' + result + ')';
+			if (currentPrecedence > options.precedence) {
+				result = expression.operator + formatBase(expression.argument);
+			} else {
+				result = expression.operator + ' ' + formatBase(expression.argument);
 			}
 
 		} else if (expressionType == 'CallExpression') {
-
-			result = formatBase(expression.base) + '(';
-
-			each(expression.arguments, function(argument, needsComma) {
-				result += formatExpression(argument);
-				if (needsComma) {
-					result += ',';
-				}
-			});
-			result += ')';
-
-		} else if (expressionType == 'TableCallExpression') {
-
-			result = formatExpression(expression.base) +
-				formatExpression(expression.arguments);
-
-		} else if (expressionType == 'StringCallExpression') {
-
-			result = formatExpression(expression.base) +
-				formatExpression(expression.argument);
-
-		} else if (expressionType == 'IndexExpression') {
-
-			result = formatBase(expression.base) + '[' +
-				formatExpression(expression.index) + ']';
-
-		} else if (expressionType == 'MemberExpression') {
-
-			result = formatBase(expression.base) + expression.indexer +
-				formatExpression(expression.identifier, {
-					'preserveIdentifiers': true
-				});
-
-		} else if (expressionType == 'FunctionDeclaration') {
-
-			result = 'function(';
-			if (expression.parameters.length) {
-				each(expression.parameters, function(parameter, needsComma) {
-					// `Identifier`s have a `name`, `VarargLiteral`s have a `value`
-					result += parameter.name
-						? generateIdentifier(parameter.name)
-						: parameter.value;
-					if (needsComma) {
-						result += ',';
-					}
-				});
-			}
-			result += ')';
-			result = joinStatements(result, formatStatementList(expression.body));
-			result = joinStatements(result, 'end');
-
+			result = formatBase(expression.callee) + '(' + joinStatements(formatArguments(expression.arguments)) + ')';
 		} else if (expressionType == 'TableConstructorExpression') {
-
-			result = '{';
-
-			each(expression.fields, function(field, needsComma) {
-				if (field.type == 'TableKey') {
-					result += '[' + formatExpression(field.key) + ']=' +
-						formatExpression(field.value);
-				} else if (field.type == 'TableValue') {
-					result += formatExpression(field.value);
-				} else { // at this point, `field.type == 'TableKeyString'`
-					result += formatExpression(field.key, {
-						// TODO: keep track of nested scopes (#18)
-						'preserveIdentifiers': true
-					}) + '=' + formatExpression(field.value);
-				}
-				if (needsComma) {
-					result += ',';
-				}
-			});
-
-			result += '}';
-
-		} else {
-
-			throw TypeError('Unknown expression type: `' + expressionType + '`');
-
+			result = '{' + joinStatements(formatArguments(expression.fields)) + '}';
+		} else if (expressionType == 'FunctionDeclaration') {
+			result = 'function' + joinStatements(formatArguments(expression.parameters)) + formatBase(expression.body);
 		}
 
 		return result;
 	};
 
-	var formatStatementList = function(body) {
+	var formatArguments = function(argumentsList) {
 		var result = '';
-		each(body, function(statement) {
-			result = joinStatements(result, formatStatement(statement), ';');
+		each(argumentsList, function(argument, isLast) {
+			result += formatExpression(argument);
+			if (!isLast) {
+				result += ', ';
+			}
 		});
 		return result;
 	};
 
-	var formatStatement = function(statement) {
-		var result = '';
-		var statementType = statement.type;
-
-		if (statementType == 'AssignmentStatement') {
-
-			// left-hand side
-			each(statement.variables, function(variable, needsComma) {
-				result += formatExpression(variable);
-				if (needsComma) {
-					result += ',';
-				}
-			});
-
-			// right-hand side
-			result += '=';
-			each(statement.init, function(init, needsComma) {
-				result += formatExpression(init);
-				if (needsComma) {
-					result += ',';
-				}
-			});
-
-		} else if (statementType == 'LocalStatement') {
-
-			result = 'local ';
-
-			// left-hand side
-			each(statement.variables, function(variable, needsComma) {
-				// Variables in a `LocalStatement` are always local, duh
-				result += generateIdentifier(variable.name);
-				if (needsComma) {
-					result += ',';
-				}
-			});
-
-			// right-hand side
-			if (statement.init.length) {
-				result += '=';
-				each(statement.init, function(init, needsComma) {
-					result += formatExpression(init);
-					if (needsComma) {
-						result += ',';
-					}
-				});
-			}
-
-		} else if (statementType == 'CallStatement') {
-
-			result = formatExpression(statement.expression);
-
-		} else if (statementType == 'IfStatement') {
-
-			result = joinStatements(
-				'if',
-				formatExpression(statement.clauses[0].condition)
-			);
-			result = joinStatements(result, 'then');
-			result = joinStatements(
-				result,
-				formatStatementList(statement.clauses[0].body)
-			);
-			each(statement.clauses.slice(1), function(clause) {
-				if (clause.condition) {
-					result = joinStatements(result, 'elseif');
-					result = joinStatements(result, formatExpression(clause.condition));
-					result = joinStatements(result, 'then');
-				} else {
-					result = joinStatements(result, 'else');
-				}
-				result = joinStatements(result, formatStatementList(clause.body));
-			});
-			result = joinStatements(result, 'end');
-
-		} else if (statementType == 'WhileStatement') {
-
-			result = joinStatements('while', formatExpression(statement.condition));
-			result = joinStatements(result, 'do');
-			result = joinStatements(result, formatStatementList(statement.body));
-			result = joinStatements(result, 'end');
-
-		} else if (statementType == 'DoStatement') {
-
-			result = joinStatements('do', formatStatementList(statement.body));
-			result = joinStatements(result, 'end');
-
-		} else if (statementType == 'ReturnStatement') {
-
-			result = 'return';
-
-			each(statement.arguments, function(argument, needsComma) {
-				result = joinStatements(result, formatExpression(argument));
-				if (needsComma) {
-					result += ',';
-				}
-			});
-
-		} else if (statementType == 'BreakStatement') {
-
-			result = 'break';
-
-		} else if (statementType == 'RepeatStatement') {
-
-			result = joinStatements('repeat', formatStatementList(statement.body));
-			result = joinStatements(result, 'until');
-			result = joinStatements(result, formatExpression(statement.condition))
-
-		} else if (statementType == 'FunctionDeclaration') {
-
-			result = (statement.isLocal ? 'local ' : '') + 'function ';
-			result += formatExpression(statement.identifier);
-			result += '(';
-
-			if (statement.parameters.length) {
-				each(statement.parameters, function(parameter, needsComma) {
-					// `Identifier`s have a `name`, `VarargLiteral`s have a `value`
-					result += parameter.name
-						? generateIdentifier(parameter.name)
-						: parameter.value;
-					if (needsComma) {
-						result += ',';
-					}
-				});
-			}
-
-			result += ')';
-			result = joinStatements(result, formatStatementList(statement.body));
-			result = joinStatements(result, 'end');
-
-		} else if (statementType == 'ForGenericStatement') {
-			// see also `ForNumericStatement`
-
-			result = 'for ';
-
-			each(statement.variables, function(variable, needsComma) {
-				// The variables in a `ForGenericStatement` are always local
-				result += generateIdentifier(variable.name);
-				if (needsComma) {
-					result += ',';
-				}
-			});
-
-			result += ' in';
-
-			each(statement.iterators, function(iterator, needsComma) {
-				result = joinStatements(result, formatExpression(iterator));
-				if (needsComma) {
-					result += ',';
-				}
-			});
-
-			result = joinStatements(result, 'do');
-			result = joinStatements(result, formatStatementList(statement.body));
-			result = joinStatements(result, 'end');
-
-		} else if (statementType == 'ForNumericStatement') {
-
-			// The variables in a `ForNumericStatement` are always local
-			result = 'for ' + generateIdentifier(statement.variable.name) + '=';
-			result += formatExpression(statement.start) + ',' +
-				formatExpression(statement.end);
-
-			if (statement.step) {
-				result += ',' + formatExpression(statement.step);
-			}
-
-			result = joinStatements(result, 'do');
-			result = joinStatements(result, formatStatementList(statement.body));
-			result = joinStatements(result, 'end');
-
-		} else if (statementType == 'LabelStatement') {
-
-			// The identifier names in a `LabelStatement` can safely be renamed
-			result = '::' + generateIdentifier(statement.label.name) + '::';
-
-		} else if (statementType == 'GotoStatement') {
-
-			// The identifier names in a `GotoStatement` can safely be renamed
-			result = 'goto ' + generateIdentifier(statement.label.name);
-
-		} else {
-
-			throw TypeError('Unknown statement type: `' + statementType + '`');
-
-		}
-
-		return result;
+	var formatFunction = function(func) {
+		return formatExpression(func);
 	};
 
-	var minify = function(argument) {
-		// `argument` can be a Lua code snippet (string)
-		// or a luaparse-compatible AST (object)
-		var ast = typeof argument == 'string'
-			? parse(argument)
-			: argument;
+	// Expose functions for external usage
+	root.luaparse = luaparse;
+	root.formatBase = formatBase;
+	root.formatExpression = formatExpression;
+	root.formatArguments = formatArguments;
+	root.formatFunction = formatFunction;
 
-		// (Re)set temporary identifier values
-		identifierMap = {};
-		identifiersInUse = [];
-		// This is a shortcut to help generate the first identifier (`a`) faster
-		currentIdentifier = '9';
-
-		// Make sure global variable names aren't renamed
-		if (ast.globals) {
-			each(ast.globals, function(object) {
-				var name = object.name;
-				identifierMap[name] = name;
-				identifiersInUse.push(name);
-			});
-		} else {
-			throw Error('Missing required AST property: `globals`');
-		}
-
-		return formatStatementList(ast.body);
-	};
-
-	/*--------------------------------------------------------------------------*/
-
-	var luamin = {
-		'version': '1.0.4',
-		'minify': minify
-	};
-
-	// Some AMD build optimizers, like r.js, check for specific condition patterns
-	// like the following:
-	if (
-		typeof define == 'function' &&
-		typeof define.amd == 'object' &&
-		define.amd
-	) {
-		define(function() {
-			return luamin;
-		});
-	}	else if (freeExports && !freeExports.nodeType) {
-		if (freeModule) { // in Node.js or RingoJS v0.8.0+
-			freeModule.exports = luamin;
-		} else { // in Narwhal or RingoJS v0.7.0-
-			extend(freeExports, luamin);
-		}
-	} else { // in Rhino or a web browser
-		root.luamin = luamin;
-	}
-
-}(this));
+})(this);
