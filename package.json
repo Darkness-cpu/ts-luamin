@@ -1,20 +1,11 @@
 {
-  "name": "@ts/luamin",
+  "name": "@types/luamin",
   "version": "1.0.0",
-  "main": "./luamin.js",
-  "module": "./luamin.mjs",
+  "main": "",
   "types": "./luamin.d.ts",
-  "files": ["cli.js","luamin.js","luamin.d.ts"],
-  "bin": "cli.js",
+  "files": ["luamin.d.ts"],
   "keywords": [],
   "author": "mistakes",
   "license": "ISC",
   "description": ""
-},
-"dependencies": {
-    "luaparse": "latest"
-    "istanbul": "~0.4.2",
-    "qunit-extras": "~1.4.5",
-    "qunitjs": "~1.11.0",
-    "requirejs": "~2.1.22"
-  }
+}
